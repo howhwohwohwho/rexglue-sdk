@@ -55,7 +55,8 @@ int RunWindowedApp(int argc, char** argv) {
     }
 #endif
 
-    std::unique_ptr<rex::ui::WindowedApp> app = rex::ui::GetWindowedAppCreator()(app_context);
+    std::unique_ptr<rex::ui::WindowedApp> app =
+        rex::ui::GetWindowedAppCreator()(app_context);
 
     // Match remaining positional args to the app's expected options.
     const auto& option_names = app->GetPositionalOptions();
@@ -66,7 +67,8 @@ int RunWindowedApp(int argc, char** argv) {
     }
     app->SetParsedArguments(std::move(parsed));
 
-    result = app->OnInitialize() ? app_context.RunMainMessageLoop() : EXIT_FAILURE;
+    result =
+        app->OnInitialize() ? app_context.RunMainMessageLoop() : EXIT_FAILURE;
 
     app->InvokeOnDestroy();
   }
@@ -83,19 +85,40 @@ int RunWindowedApp(int argc, char** argv) {
 std::vector<std::string> WideArgsToUtf8(int argc, wchar_t** wargv) {
   std::vector<std::string> args;
   args.reserve(static_cast<size_t>(argc));
+
   for (int i = 0; i < argc; ++i) {
     std::wstring wide(wargv[i]);
+
     if (wide.empty()) {
       args.emplace_back();
       continue;
     }
-    int size = WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), nullptr,
-                                   0, nullptr, nullptr);
+
+    int size = WideCharToMultiByte(
+        CP_UTF8,
+        0,
+        wide.data(),
+        static_cast<int>(wide.size()),
+        nullptr,
+        0,
+        nullptr,
+        nullptr);
+
     std::string utf8(static_cast<size_t>(size), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), utf8.data(), size,
-                        nullptr, nullptr);
+
+    WideCharToMultiByte(
+        CP_UTF8,
+        0,
+        wide.data(),
+        static_cast<int>(wide.size()),
+        utf8.data(),
+        size,
+        nullptr,
+        nullptr);
+
     args.push_back(std::move(utf8));
   }
+
   return args;
 }
 #endif
@@ -104,7 +127,9 @@ std::vector<std::string> WideArgsToUtf8(int argc, wchar_t** wargv) {
 
 #if REX_PLATFORM_WIN32
 
-int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hinstance_prev, LPWSTR command_line,
+int WINAPI wWinMain(HINSTANCE hinstance,
+                    HINSTANCE hinstance_prev,
+                    LPWSTR command_line,
                     int show_cmd) {
   (void)hinstance;
   (void)hinstance_prev;
@@ -112,16 +137,23 @@ int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hinstance_prev, LPWSTR comman
   (void)show_cmd;
 
   int wargc = 0;
-  wchar_t** wargv = CommandLineToArgvW(GetCommandLineW(), &wargc);
+  wchar_t** wargv =
+      CommandLineToArgvW(GetCommandLineW(), &wargc);
+
   auto utf8_args = WideArgsToUtf8(wargc, wargv);
+
   LocalFree(wargv);
 
   std::vector<char*> argv_ptrs;
   argv_ptrs.reserve(utf8_args.size());
+
   for (auto& s : utf8_args) {
     argv_ptrs.push_back(s.data());
   }
-  return RunWindowedApp(static_cast<int>(argv_ptrs.size()), argv_ptrs.data());
+
+  return RunWindowedApp(
+      static_cast<int>(argv_ptrs.size()),
+      argv_ptrs.data());
 }
 
 #else

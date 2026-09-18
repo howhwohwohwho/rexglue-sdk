@@ -42,7 +42,7 @@
 #if REX_PLATFORM_WIN32
 #include <rex/ui/surface_win.h>
 #endif
-#if REX_PLATFORM_MAC
+#if REX_PLATFORM_MAC || REX_PLATFORM_IOS
 #include <rex/ui/surface_mac.h>
 #endif
 

@@ -28,7 +28,9 @@
 #include <TargetConditionals.h>
 #endif
 
-#if defined(TARGET_OS_MAC) && TARGET_OS_MAC
+#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+#define REX_PLATFORM_IOS 1
+#elif defined(TARGET_OS_MAC) && TARGET_OS_MAC
 #define REX_PLATFORM_MAC 1
 #elif defined(WIN32) || defined(_WIN32)
 #define REX_PLATFORM_WIN32 1
@@ -46,6 +48,9 @@
 // so they can be used in static_assert and regular expressions.
 #ifndef REX_PLATFORM_MAC
 #define REX_PLATFORM_MAC 0
+#endif
+#ifndef REX_PLATFORM_IOS
+#define REX_PLATFORM_IOS 0
 #endif
 #ifndef REX_PLATFORM_WIN32
 #define REX_PLATFORM_WIN32 0
@@ -90,9 +95,9 @@
 #include <x86intrin.h>
 #endif  // REX_PLATFORM_WIN32
 
-#if REX_PLATFORM_MAC
+#if REX_PLATFORM_MAC || REX_PLATFORM_IOS
 #include <libkern/OSByteOrder.h>
-#endif  // REX_PLATFORM_MAC
+#endif  // REX_PLATFORM_MAC || REX_PLATFORM_IOS
 
 #include <bit>
 #include <cstdint>
@@ -105,10 +110,12 @@
 // Clang has builtin rotate functions and debugtrap
 #elif defined(__GNUC__)
 #ifndef __builtin_rotateleft32
-#define __builtin_rotateleft32(x, n) std::rotl(static_cast<uint32_t>(x), static_cast<int>(n))
+#define __builtin_rotateleft32(x, n) \
+  std::rotl(static_cast<uint32_t>(x), static_cast<int>(n))
 #endif
 #ifndef __builtin_rotateleft64
-#define __builtin_rotateleft64(x, n) std::rotl(static_cast<uint64_t>(x), static_cast<int>(n))
+#define __builtin_rotateleft64(x, n) \
+  std::rotl(static_cast<uint64_t>(x), static_cast<int>(n))
 #endif
 #ifndef __builtin_debugtrap
 #if defined(__x86_64__) || defined(__i386__)
@@ -120,9 +127,10 @@
 #endif
 
 #if REX_COMPILER_MSVC
-#define _REXPACKEDSCOPE(body) __pragma(pack(push, 1)) body __pragma(pack(pop));
+#define _REXPACKEDSCOPE(body) \
+  __pragma(pack(push, 1)) body __pragma(pack(pop));
 #else
-#define _REXPACKEDSCOPE(body)    \
+#define _REXPACKEDSCOPE(body) \
   _Pragma("pack(push, 1)") body; \
   _Pragma("pack(pop)");
 #endif  // REX_COMPILER_MSVC
