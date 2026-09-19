@@ -30,7 +30,8 @@ class DynamicLibrary {
   DynamicLibrary(DynamicLibrary&& other) noexcept;
   DynamicLibrary& operator=(DynamicLibrary&& other) noexcept;
 
-  bool Load(const std::filesystem::path& path, SymbolResolution mode = SymbolResolution::kLazy);
+  bool Load(const std::filesystem::path& path,
+            SymbolResolution mode = SymbolResolution::kLazy);
   void Close();
   explicit operator bool() const { return handle_ != nullptr; }
 
@@ -57,22 +58,34 @@ inline constexpr const char* kSpirvToolsSdkPath = "Bin/SPIRV-Tools-shared.dll";
 
 inline constexpr const char* kVulkanLoader = "libvulkan.so";
 inline constexpr const char* kRenderDoc = "libVkLayer_GLES_RenderDoc.so";
-inline constexpr const char* kSpirvToolsSdkPath = "bin/libSPIRV-Tools-shared.so";
+inline constexpr const char* kSpirvToolsSdkPath =
+    "bin/libSPIRV-Tools-shared.so";
 
 #elif REX_PLATFORM_LINUX
 
 inline constexpr const char* kVulkanLoader = "libvulkan.so.1";
 inline constexpr const char* kRenderDoc = "librenderdoc.so";
-inline constexpr const char* kSpirvToolsSdkPath = "bin/libSPIRV-Tools-shared.so";
+inline constexpr const char* kSpirvToolsSdkPath =
+    "bin/libSPIRV-Tools-shared.so";
 
 #elif REX_PLATFORM_MAC
 
 inline constexpr const char* kVulkanLoader = "libvulkan.1.dylib";
 inline constexpr const char* kRenderDoc = "librenderdoc.dylib";
-inline constexpr const char* kSpirvToolsSdkPath = "lib/libSPIRV-Tools-shared.dylib";
+inline constexpr const char* kSpirvToolsSdkPath =
+    "lib/libSPIRV-Tools-shared.dylib";
+
+#elif REX_PLATFORM_IOS
+
+inline constexpr const char* kVulkanLoader = "libvulkan.dylib";
+inline constexpr const char* kRenderDoc = "librenderdoc.dylib";
+inline constexpr const char* kSpirvToolsSdkPath =
+    "lib/libSPIRV-Tools-shared.dylib";
 
 #else
+
 #error No library names provided for the target platform.
+
 #endif
 
 }  // namespace lib_names
