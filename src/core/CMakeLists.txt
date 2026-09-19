@@ -53,7 +53,7 @@ if(WIN32)
         threading_win.cpp
     )
     target_compile_definitions(rexcore PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
-elseif(UNIX)
+elseif(UNIX OR IOS)
     # Linux and macOS/Darwin share the POSIX sources; Darwin-specific behavior
     # is selected inside them with #if defined(__APPLE__).
     target_sources(rexcore PRIVATE
