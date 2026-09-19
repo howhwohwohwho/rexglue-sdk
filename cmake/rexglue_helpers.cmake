@@ -38,6 +38,46 @@ function(_rexglue_stage_macos_vulkan_runtime target_name)
     )
 endfunction()
 
+function(_rexglue_stage_ios_vulkan_runtime target_name)
+    if(TARGET Vulkan::Loader AND TARGET MoltenVK::MoltenVK)
+        set(_rexglue_vulkan_loader Vulkan::Loader)
+        set(_rexglue_moltenvk MoltenVK::MoltenVK)
+        set(_rexglue_moltenvk_icd "${REXGLUE_ROOT}/cmake/MoltenVK_icd.json")
+    elseif(TARGET rex::vulkan-loader AND TARGET rex::moltenvk)
+        set(_rexglue_vulkan_loader rex::vulkan-loader)
+        set(_rexglue_moltenvk rex::moltenvk)
+        set(_rexglue_moltenvk_icd "${REXGLUE_MOLTENVK_ICD}")
+    else()
+        message(FATAL_ERROR "rexglue: pinned iOS Vulkan runtime targets are unavailable")
+    endif()
+
+    if(NOT TARGET ${target_name})
+        message(FATAL_ERROR
+            "rexglue: cannot stage iOS Vulkan runtime for unknown target "
+            "'${target_name}'")
+    endif()
+
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks"
+            "$<TARGET_BUNDLE_DIR:${target_name}>/Resources/vulkan/icd.d"
+
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:${_rexglue_vulkan_loader}>"
+            "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks/libvulkan.1.dylib"
+
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:${_rexglue_moltenvk}>"
+            "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks/libMoltenVK.dylib"
+
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${_rexglue_moltenvk_icd}"
+            "$<TARGET_BUNDLE_DIR:${target_name}>/Resources/vulkan/icd.d/MoltenVK_icd.json"
+
+        VERBATIM
+    )
+endfunction()
+
 #==========================================================
 # rexglue_apply_target_settings(<target>) - Common flags
 #
@@ -89,13 +129,20 @@ function(rexglue_configure_target target_name)
             INSTALL_RPATH "$ORIGIN"
             BUILD_WITH_INSTALL_RPATH ON
         )
-    elseif(APPLE)
+    elseif(APPLE AND NOT IOS)
         # macOS analogue of $ORIGIN: resolve @rpath dylibs (librexruntime,
         # libTracyClient, ...) next to the executable. Pairs with the runtime
         # dylib staging below so the app is self-contained.
         set_target_properties(${target_name} PROPERTIES
             INSTALL_RPATH "@executable_path"
             BUILD_WITH_INSTALL_RPATH ON
+        )
+    elseif(IOS)
+        # iOS applications use an application bundle rather than a normal
+        # desktop executable directory. Runtime libraries are staged into
+        # the bundle's Frameworks directory below.
+        set_target_properties(${target_name} PROPERTIES
+            MACOSX_BUNDLE TRUE
         )
     endif()
 
@@ -109,7 +156,7 @@ function(rexglue_configure_target target_name)
             COMMAND_EXPAND_LISTS
             VERBATIM
         )
-    elseif(APPLE)
+    elseif(APPLE AND NOT IOS)
         # macOS: $<TARGET_RUNTIME_DLLS> does not resolve imported dylibs, so
         # stage the shared runtime libraries explicitly next to the executable
         # (paired with the @executable_path rpath above). Everything else the
@@ -121,6 +168,20 @@ function(rexglue_configure_target target_name)
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         $<TARGET_FILE:${_rexglue_runtime_lib}>
                         $<TARGET_FILE_DIR:${target_name}>
+                    VERBATIM
+                )
+            endif()
+        endforeach()
+    elseif(IOS)
+        # iOS runtime libraries belong inside the application bundle.
+        foreach(_rexglue_runtime_lib rex::runtime rexruntime rex::TracyClient TracyClient)
+            if(TARGET ${_rexglue_runtime_lib})
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory
+                        "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        $<TARGET_FILE:${_rexglue_runtime_lib}>
+                        "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks"
                     VERBATIM
                 )
             endif()
@@ -157,16 +218,31 @@ function(rexglue_configure_target target_name)
                 "rexglue_configure_target: unknown GPU plugin '${_plugin}' "
                 "(no target rexgpu-${_plugin} or rex::gpu-${_plugin})")
         endif()
-        add_custom_command(TARGET ${target_name} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_FILE:${_plugin_target}>
-                $<TARGET_FILE_DIR:${target_name}>
-            VERBATIM
-        )
+
+        if(IOS)
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:${_plugin_target}>
+                    "$<TARGET_BUNDLE_DIR:${target_name}>/Frameworks"
+                VERBATIM
+            )
+        else()
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    $<TARGET_FILE:${_plugin_target}>
+                    $<TARGET_FILE_DIR:${target_name}>
+                VERBATIM
+            )
+        endif()
+
         unset(_plugin_target)
     endforeach()
 
-    if(APPLE AND REXGLUE_USE_VULKAN)
+    if(IOS AND REXGLUE_USE_VULKAN)
+        _rexglue_stage_ios_vulkan_runtime(${target_name})
+    elseif(APPLE AND NOT IOS AND REXGLUE_USE_VULKAN)
         _rexglue_stage_macos_vulkan_runtime(${target_name})
     endif()
 endfunction()
@@ -184,11 +260,20 @@ function(rexglue_configure_module_target target_name)
     cmake_parse_arguments(ARG "" "HOST" "" ${ARGN})
 
     if(ARG_HOST)
-        set_target_properties(${target_name} PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${ARG_HOST}>
-            RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${ARG_HOST}>
-            ARCHIVE_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${ARG_HOST}>
-        )
+        if(IOS)
+            set_target_properties(${target_name} PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY "$<TARGET_BUNDLE_DIR:${ARG_HOST}>/Frameworks"
+                RUNTIME_OUTPUT_DIRECTORY "$<TARGET_BUNDLE_DIR:${ARG_HOST}>/Frameworks"
+                ARCHIVE_OUTPUT_DIRECTORY "$<TARGET_BUNDLE_DIR:${ARG_HOST}>/Frameworks"
+            )
+        else()
+            set_target_properties(${target_name} PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${ARG_HOST}>
+                RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${ARG_HOST}>
+                ARCHIVE_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:${ARG_HOST}>
+            )
+        endif()
+
         # Defer add_dependencies so the host target may be declared after
         # this module call. Wrapping in EVAL CODE expands the variables now,
         # which DEFER CALL otherwise treats as literal argument text.
@@ -264,6 +349,7 @@ function(rexglue_embed_metadata target_name)
     foreach(_rexglue_file IN LISTS _rexglue_regular_files)
         file(RELATIVE_PATH _rexglue_rel "${ARG_DIRECTORY}" "${_rexglue_file}")
         string(REPLACE "\\" "/" _rexglue_rel "${_rexglue_rel}")
+
         if(ARG_PREFIX)
             string(REPLACE "\\" "/" _rexglue_prefix "${ARG_PREFIX}")
             string(REGEX REPLACE "/$" "" _rexglue_prefix "${_rexglue_prefix}")
@@ -271,22 +357,32 @@ function(rexglue_embed_metadata target_name)
         else()
             set(_rexglue_asset_path "${_rexglue_rel}")
         endif()
+
         string(REPLACE "\"" "\\\"" _rexglue_asset_path "${_rexglue_asset_path}")
 
         string(MD5 _rexglue_asset_id "${_rexglue_asset_path}")
         file(READ "${_rexglue_file}" _rexglue_hex HEX)
-        string(REGEX REPLACE "([0-9A-Fa-f][0-9A-Fa-f])" "0x\\1," _rexglue_bytes "${_rexglue_hex}")
+        string(REGEX REPLACE
+            "([0-9A-Fa-f][0-9A-Fa-f])"
+            "0x\\1,"
+            _rexglue_bytes
+            "${_rexglue_hex}")
 
         string(APPEND _rexglue_content
             "const std::uint8_t kAsset_${_rexglue_asset_id}[] = {${_rexglue_bytes}};\n"
             "const bool kRegistered_${_rexglue_asset_id} = "
             "::rex::RegisterEmbeddedMetadataAsset(\"${_rexglue_asset_path}\", "
             "kAsset_${_rexglue_asset_id}, sizeof(kAsset_${_rexglue_asset_id}));\n\n")
+
         math(EXPR _rexglue_count "${_rexglue_count} + 1")
     endforeach()
 
     string(APPEND _rexglue_content "}  // namespace\n")
     file(WRITE "${_rexglue_output}" "${_rexglue_content}")
+
     target_sources(${target_name} PRIVATE "${_rexglue_output}")
-    message(STATUS "Embedded ${_rexglue_count} metadata asset(s) into ${target_name}")
+
+    message(STATUS
+        "Embedded ${_rexglue_count} metadata asset(s) into ${target_name}")
 endfunction()
+

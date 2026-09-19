@@ -30,15 +30,17 @@ namespace {
 // part of rexruntime, so REXGLUE_BUILD_CONFIG matches the plugin's config.
 std::string PluginFileName(std::string_view name) {
   constexpr std::string_view kConfig = REXGLUE_BUILD_CONFIG;
+
   std::string_view postfix = "";
   if (kConfig == "Debug") {
     postfix = "d";
   } else if (kConfig == "RelWithDebInfo") {
     postfix = "rd";
   }
+
 #if REX_PLATFORM_WIN32
   return fmt::format("rexgpu-{}{}.dll", name, postfix);
-#elif REX_PLATFORM_MAC
+#elif REX_PLATFORM_MAC || REX_PLATFORM_IOS
   return fmt::format("librexgpu-{}{}.dylib", name, postfix);
 #else
   return fmt::format("librexgpu-{}{}.so", name, postfix);
@@ -54,8 +56,11 @@ std::vector<platform::DynamicLibrary>& LoadedPlugins() {
 
 }  // namespace
 
-std::unique_ptr<IGraphicsSystem> LoadGpuPlugin(std::string_view name, std::string_view backend) {
-  auto path = rex::filesystem::GetExecutableFolder() / PluginFileName(name);
+std::unique_ptr<IGraphicsSystem> LoadGpuPlugin(std::string_view name,
+                                              std::string_view backend) {
+  auto path =
+      rex::filesystem::GetExecutableFolder() / PluginFileName(name);
+
   if (!std::filesystem::exists(path)) {
     REXSYS_ERROR(
         "GPU plugin '{}' not found at {}. Stage it next to the executable "
@@ -65,40 +70,69 @@ std::unique_ptr<IGraphicsSystem> LoadGpuPlugin(std::string_view name, std::strin
   }
 
   platform::DynamicLibrary library;
+
   if (!library.Load(path, platform::SymbolResolution::kImmediate)) {
-    REXSYS_ERROR("GPU plugin '{}' failed to load: {}", name, path.string());
+    REXSYS_ERROR(
+        "GPU plugin '{}' failed to load: {}",
+        name, path.string());
     return nullptr;
   }
 
-  auto abi_version_fn = library.GetSymbol<GpuAbiVersionFn>(kGpuAbiVersionSymbol);
-  auto create_fn = library.GetSymbol<GpuCreateFn>(kGpuCreateSymbol);
+  auto abi_version_fn =
+      library.GetSymbol<GpuAbiVersionFn>(kGpuAbiVersionSymbol);
+
+  auto create_fn =
+      library.GetSymbol<GpuCreateFn>(kGpuCreateSymbol);
+
   if (!abi_version_fn || !create_fn) {
-    REXSYS_ERROR("GPU plugin '{}' is not a rexglue GPU plugin (missing {} / {} exports): {}", name,
-                 kGpuAbiVersionSymbol, kGpuCreateSymbol, path.string());
+    REXSYS_ERROR(
+        "GPU plugin '{}' is not a rexglue GPU plugin "
+        "(missing {} / {} exports): {}",
+        name,
+        kGpuAbiVersionSymbol,
+        kGpuCreateSymbol,
+        path.string());
     return nullptr;
   }
 
   uint32_t plugin_abi = abi_version_fn();
+
   if (plugin_abi != kGpuPluginAbiVersion) {
-    REXSYS_ERROR("GPU plugin '{}' has ABI version {}, host expects {}: {}", name, plugin_abi,
-                 kGpuPluginAbiVersion, path.string());
+    REXSYS_ERROR(
+        "GPU plugin '{}' has ABI version {}, "
+        "host expects {}: {}",
+        name,
+        plugin_abi,
+        kGpuPluginAbiVersion,
+        path.string());
     return nullptr;
   }
 
   std::string backend_str(backend);
+
   GpuCreateInfo info{};
   info.struct_size = sizeof(GpuCreateInfo);
   info.backend = backend_str.c_str();
 
-  IGraphicsSystem* graphics_system = create_fn(kGpuPluginAbiVersion, &info);
+  IGraphicsSystem* graphics_system =
+      create_fn(kGpuPluginAbiVersion, &info);
+
   if (!graphics_system) {
-    REXSYS_ERROR("GPU plugin '{}' factory returned no graphics system (backend '{}')", name,
-                 backend_str);
+    REXSYS_ERROR(
+        "GPU plugin '{}' factory returned no graphics system "
+        "(backend '{}')",
+        name,
+        backend_str);
     return nullptr;
   }
 
   LoadedPlugins().push_back(std::move(library));
-  REXSYS_DEBUG("GPU plugin '{}' loaded ({})", name, path.filename().string());
+
+  REXSYS_DEBUG(
+      "GPU plugin '{}' loaded ({})",
+      name,
+      path.filename().string());
+
   return std::unique_ptr<IGraphicsSystem>(graphics_system);
 }
 

@@ -441,7 +441,7 @@ Surface::TypeFlags VulkanPresenter::GetSurfaceTypesSupportedByInstance(
     type_flags |= Surface::kTypeFlag_Win32Hwnd;
   }
 #endif
-#if REX_PLATFORM_MAC
+#if REX_PLATFORM_MAC || REX_PLATFORM_IOS
   if (instance_extensions.ext_EXT_metal_surface) {
     type_flags |= Surface::kTypeFlag_CAMetalLayer;
   }
@@ -846,7 +846,7 @@ VulkanPresenter::ConnectOrReconnectPaintingToSurfaceFromUIThread(Surface& new_su
             instance, &surface_create_info, nullptr, &paint_context_.vulkan_surface);
       } break;
 #endif
-#if REX_PLATFORM_MAC
+#if REX_PLATFORM_MAC || REX_PLATFORM_IOS
       case Surface::kTypeIndex_CAMetalLayer: {
         auto& metal_surface = static_cast<const CAMetalLayerSurface&>(new_surface);
         VkMetalSurfaceCreateInfoEXT surface_create_info;
@@ -2664,3 +2664,4 @@ VkPipeline VulkanPresenter::CreateGuestOutputPaintPipeline(GuestOutputPaintEffec
 }  // namespace vulkan
 }  // namespace ui
 }  // namespace rex
+
