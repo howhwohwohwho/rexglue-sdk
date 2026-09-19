@@ -17,7 +17,7 @@
 
 #include <rex/exception_handler.h>
 
-#if REX_PLATFORM_LINUX || REX_PLATFORM_MAC
+#if REX_PLATFORM_LINUX || REX_PLATFORM_MAC || REX_PLATFORM_IOS
 
 #include <signal.h>
 
@@ -489,5 +489,4 @@ void ExceptionHandler::Uninstall(Handler fn, void* data) {
 }
 
 }  // namespace rex::arch
-
-#endif  // REX_PLATFORM_LINUX || REX_PLATFORM_MAC
+#endif  // REX_PLATFORM_LINUX || REX_PLATFORM_MAC || REX_PLATFORM_IOS
