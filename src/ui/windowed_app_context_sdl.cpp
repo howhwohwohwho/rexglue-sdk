@@ -1,4 +1,3 @@
-cpp
 /**
  * @file        ui/windowed_app_context_sdl.cpp
  * @brief       SDL3 implementation of the windowed app UI loop context

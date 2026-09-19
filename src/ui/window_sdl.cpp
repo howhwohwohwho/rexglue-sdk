@@ -1,4 +1,3 @@
-cpp
 /**
  * @file        ui/window_sdl.cpp
  * @brief       SDL3 implementation of the Window abstraction
