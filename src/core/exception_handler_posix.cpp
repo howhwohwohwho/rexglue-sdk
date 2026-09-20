@@ -159,7 +159,7 @@ static void ExceptionHandlerCallback(int signal_number, siginfo_t* signal_info,
     thread_context.fpcr = mcontext_fpsimd->fpcr;
     std::memcpy(thread_context.v, mcontext_fpsimd->vregs, sizeof(thread_context.v));
   }
-#endif  // REX_PLATFORM_MAC
+#endif  // REX_PLATFORM_MAC || REX_PLATFORM_IOS
 #endif  // REX_ARCH
 
   Exception ex;
@@ -248,7 +248,7 @@ static void ExceptionHandlerCallback(int signal_number, siginfo_t* signal_info,
           access_violation_operation = Exception::AccessViolationOperation::kUnknown;
         }
       }
-#endif  // REX_PLATFORM_MAC
+#endif  // REX_PLATFORM_MAC || REX_PLATFORM_IOS
 #else
       access_violation_operation = Exception::AccessViolationOperation::kUnknown;
 #endif  // REX_ARCH
@@ -412,7 +412,7 @@ static void ExceptionHandlerCallback(int signal_number, siginfo_t* signal_info,
           mcontext.regs[modified_register_index] = thread_context.x[modified_register_index];
         }
       }
-#endif  // REX_PLATFORM_MAC
+#endif  // REX_PLATFORM_MAC || REX_PLATFORM_IOS
 #endif  // REX_ARCH
       return;
     }
