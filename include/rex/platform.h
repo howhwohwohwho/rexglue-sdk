@@ -28,10 +28,12 @@
 #include <TargetConditionals.h>
 #endif
 
-#if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 #define REX_PLATFORM_IOS 1
-#elif defined(TARGET_OS_MAC) && TARGET_OS_MAC
+#elif defined(__APPLE__) && defined(TARGET_OS_MAC) && TARGET_OS_MAC
 #define REX_PLATFORM_MAC 1
+#elif defined(__APPLE__) && defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+#define REX_PLATFORM_IOS 1
 #elif defined(WIN32) || defined(_WIN32)
 #define REX_PLATFORM_WIN32 1
 #elif defined(__ANDROID__)
